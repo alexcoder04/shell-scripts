@@ -1,0 +1,119 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021-2022 alexcoder04 <https://github.com/alexcoder04>
+#                                                          
+# my init script for any window manager,
+# now replaced with https://github.com/alexcoder04/gutu
+
+# -----------------------------------------------------------------------------
+# SETTINGS
+# ------------------------------------------------------------------------- {{{
+BRIGHTNESS_LAPTOP="15000"
+BRIGHTNESS_WITH_HDMI="11000"
+CHANGE_BRIGHTNESS="true"
+COMPOSITOR="picom --experimental-backends"
+ENABLE_DROPDOWN_IN_I3="true"
+REDSHIFT_START="18:30"
+SET_WALLPAPER="true"
+
+# in case you want to override any of the above settings
+CFG_DIR="$XDG_CONFIG_HOME/wm-init"
+[ -f "$CFG_DIR/theme" ] && . "$CFG_DIR/theme"
+[ -f "$CFG_DIR/config" ] && . "$CFG_DIR/config"
+# }}}
+
+# -----------------------------------------------------------------------------
+# DEFINE DESKTOP-SPECIFIC ACTIONS
+# ------------------------------------------------------------------------- {{{
+# i3 {{{
+i3_specific(){
+  [ "$ENABLE_DROPDOWN_IN_I3" = "true" ] || return
+  pgrep -f "dropdown" >/dev/null \
+    || launch -d &
+  command -v "libinput-gestures-setup" >/dev/null \
+    && libinput-gestures-setup restart &
+}
+# }}}
+
+# bspwm {{{
+bspwm_specific(){
+  sxhkd -c "$XDG_CONFIG_HOME/sxhkd/bspwm.sxhkdrc" &
+}
+# }}}
+
+# X11 {{{
+x11_specific(){
+  fix-keyboard &
+  killall "$COMPOSITOR"; $COMPOSITOR &
+  killall sxhkd; sxhkd &
+  if [ "$CHANGE_BRIGHTNESS" = "true" ]; then
+    xrandr | grep "HDMI-1 connected" \
+      && doas /usr/local/bin/brightness abs "$BRIGHTNESS_WITH_HDMI" \
+  	  || doas /usr/local/bin/brightness abs "$BRIGHTNESS_LAPTOP"
+  fi
+  if command -v "nm-applet" >/dev/null; then
+    killall "nm-applet"
+    nm-applet &
+  fi
+}
+# }}}
+
+# sway {{{
+sway_specific(){
+  # another socket file
+  if [ -n "$SWAYSOCK" ]; then
+    rm -f "$XDG_RUNTIME_DIR/swaysock"
+    ln -s "$SWAYSOCK" "$XDG_RUNTIME_DIR/swaysock"
+  fi
+
+  # do this stuff if idle
+  killall swayidle
+  swayidle \
+    timeout 295 "notify-send -t 4000 'screen turns off in 5 secs!'" \
+    timeout 300 "screenlock --monitors-off" resume "swaymsg 'output * dpms on'" \
+    timeout 420 "loginctl suspend" &
+
+  if [ "$CHANGE_BRIGHTNESS" = "true" ]; then
+    swaymsg -p -t get_outputs | grep -E 'Output HDMI\-A\-1.+\(focused\)' \
+      && doas /usr/local/bin/brightness abs "$BRIGHTNESS_WITH_HDMI" \
+  	  || doas /usr/local/bin/brightness abs "$BRIGHTNESS_LAPTOP"
+  fi
+
+  # redshift
+  killall wlsunset; wlsunset -s "$REDSHIFT_START" -S 05:00 -d 600 &
+
+  # nsxiv cannot be configured in another way
+  xrdb -load "$HOME/.config/X11/Xresources" &
+}
+# }}}
+# }}}
+
+# -----------------------------------------------------------------------------
+# SET WALLPAPER AND MONITORS
+# -----------------------------------------------------------------------------
+[ "$SET_WALLPAPER" = "true" ] \
+  && wallpaper-select --random &
+[ -f "/tmp/monitors.setting" ] \
+  && monitors-set &
+
+# -----------------------------------------------------------------------------
+# RESTART DAEMONS
+# -----------------------------------------------------------------------------
+for p in pipewire wireplumber pipewire-pulse dunst; do
+  killall "$p"; "$p" &
+done
+
+# -----------------------------------------------------------------------------
+# DESKTOP-SPECIFIC STUFF
+# -----------------------------------------------------------------------------
+case "$(get_desktop)" in
+  i3)    x11_specific;  i3_specific    ;;
+  bspwm) x11_specific;  bspwm_specific ;;
+  qtile) x11_specific                  ;;
+  sway)  sway_specific; i3_specific    ;;
+esac
