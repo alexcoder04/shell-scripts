@@ -1,0 +1,105 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021-2022 alexcoder04 <https://github.com/alexcoder04>
+# 
+# a script that installs an appimage into /usr/local
+# and creates a desktop file
+
+MENU_ENTRIES="/usr/share/applications"
+INSTALL_LOC="/opt/appimages"
+ENTER_FILE="/tmp/appimageinstall-enter"
+
+. libsh || exit 1
+
+[ -z "$1" ] && die "No filename was provided!"
+[ -e "$1" ] || die "Provided file does not exist!"
+command -v dialog || die "You need to install dialog to use appimage-install\nTry 'doas apt install dialog'"
+
+dialog \
+	--backtitle "Command name" \
+	--inputbox "Enter the name for the program:" 10 60 "$1" \
+	2>"$ENTER_FILE"
+destination="$INSTALL_LOC/$(echo "$1" | awk -F"/" '{print $NF}')"
+comm_name="$(cat $ENTER_FILE)"
+desktop_file="$MENU_ENTRIES/$comm_name.desktop"
+if [ -e "$destination" ]; then
+	dialog \
+		--backtitle "File already exists" \
+		--title "File $destination already exists" \
+		--yesno "Do you want to replace it?" 10 40 \
+        || die "File already exists"
+fi
+if [ -e "$desktop_file" ]; then
+	dialog \
+		--backtitle "File already exists" \
+		--title "File $desktop_file already exists" \
+		--yesno "Do you want to replace it?" 10 40 \
+        || die "File already exists"
+fi
+
+dialog \
+	--backtitle "Configuring menu entry" \
+	--title "Program name" \
+	--inputbox "Which program name do you want to appear in the menu?" 10 80 "$comm_name" 2>"$ENTER_FILE"
+menu_title="$(cat $ENTER_FILE)"
+dialog \
+	--backtitle "Configuring menu entry" \
+	--title "Comment" \
+	--inputbox "Comment you want to appear in the menu:" 10 80 "appimage" 2>"$ENTER_FILE"
+menu_comment="$(cat $ENTER_FILE)"
+dialog \
+	--backtitle "Configuring menu entry" \
+	--title "Icon" \
+	--inputbox "Icon you want for the menu:" 10 80 "$comm_name" 2>"$ENTER_FILE"
+menu_icon="$(cat $ENTER_FILE)"
+dialog \
+	--backtitle "Configuring menu entry" \
+	--title "Terminal" \
+	--inputbox "Launch the application in a terminal [true/false]?" 10 40 "false" 2>"$ENTER_FILE"
+menu_terminal="$(cat $ENTER_FILE)"
+dialog \
+	--backtitle "Configuring menu entry" \
+	--title "Categories" \
+	--inputbox "Categories, separated by semicolons" 10 80 "Other;" 2>"$ENTER_FILE"
+menu_categories="$(cat $ENTER_FILE)"
+clear
+
+echo "Copying file to $INSTALL_LOC..."
+doas cp -v "$1" "$destination"
+echo "Adding run privilegies..."
+doas chmod +x "$destination"
+echo "Creating symlink to /usr/local/bin..."
+doas ln -sv "$destination" "/usr/local/bin/$comm_name"
+
+echo "Creating menu entry..."
+cat <<EOF | doas tee "$desktop_file"
+[Desktop Entry]
+Name=$menu_title
+Comment=$menu_comment
+Exec=/usr/local/bin/$comm_name
+Icon=$menu_icon
+Terminal=$menu_terminal
+Type=Application
+Categories=$menu_categories
+EOF
+
+# shellcheck disable=SC2086
+dialog \
+	--backtitle "Configuring menu entry" \
+	--title ".desktop file" \
+	--yesno "Edit .desktop file?" 10 40 \
+    && doas $EDITOR "$desktop_file"
+
+echo "Running workaround for the cinnamon menu..."
+workaround_file="$HOME/.local/share/applications/empty.desktop"
+touch "$workaround_file"
+sleep 1
+rm "$workaround_file"
+
+echo "$menu_title was successfully installed on your system."
+
