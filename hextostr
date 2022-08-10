@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021 alexcoder04 <https://github.com/alexcoder04>
+# 
+# decode hex notation
+
+import sys
+
+hexstr = input("hex> ")
+
+all_bytes = []
+byte = ""
+for i, n in enumerate(hexstr):
+    if i % 2 == 0:
+        byte = n
+        continue
+    byte += n
+    #print("0x" + byte)
+    #print(eval("0x" + byte))
+    #print(eval("chr(0x" + byte + ")"))
+    all_bytes.append(eval("chr(0x" + byte + ")"))
+
+print("string:")
+print("------------------------------------------------")
+sys.stdout.write("".join(all_bytes))
+print("------------------------------------------------")
+
