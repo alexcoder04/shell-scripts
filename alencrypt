@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+
+# WARNING: this is not a reliable encryption tool
+# it is actually deprecated because GPG exists, but I still keep it around
+# because I think I still have some files encrypted with this...
+
+import argh
+import sys
+from getpass import getpass
+from tqdm import tqdm
+import math
+import os
+from Crypto import Random
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+
+CHUNKS = 32 * 1024 # 32 KB
+FILESIZE_LEN = 16
+IV_LEN = 16
+ENCRYPT_MODE = AES.MODE_CFB
+
+def get_key(password):
+    hashing = SHA256.new(password.encode("utf-8"))
+    return hashing.digest()
+
+def encrypt_file(file, password, progress="tqdm"):
+    if progress == "tqdm": print(f"encrypting file {file}...")
+    out_filename = file + ".enc"
+    file_size = os.path.getsize(file)
+    chunks_number = math.ceil(file_size / CHUNKS)
+    iv = Random.new().read(IV_LEN)
+    encryptor = AES.new(get_key(password), ENCRYPT_MODE, iv)
+    with open(file, "rb") as f_in:
+        with open(out_filename, "wb") as f_out:
+            f_out.write(str(file_size).zfill(FILESIZE_LEN).encode("utf-8"))
+            f_out.write(iv)
+            i = 1
+            if progress == "tqdm":
+                pbar = tqdm(desc="encrypting", total=chunks_number)
+            while True:
+                chunk = f_in.read(CHUNKS)
+                if len(chunk) == 0:
+                    break
+                if len(chunk) % 16 != 0:
+                    chunk += b" " * (16 - (len(chunk) % 16))
+                if progress == "tqdm":
+                    pbar.update(1)
+                else:
+                    os.system(f"echo {int(i / chunks_number * 100)}")
+                f_out.write(encryptor.encrypt(chunk))
+                i += 1
+    if progress == "tqdm": print(f"file '{file}' was encrypted")
+    return out_filename
+
+def decrypt_file(file, password, progress="tqdm"):
+    if progress == "tqdm": print(f"decrypting file {file}...")
+    out_filename = file.rsplit(".", 1)[0]
+    with open(file, "rb") as f_in:
+        file_size = int(f_in.read(FILESIZE_LEN))
+        chunks_number = math.ceil(file_size / CHUNKS)
+        iv = f_in.read(IV_LEN)
+        decryptor = AES.new(get_key(password), ENCRYPT_MODE, iv)
+        with open(out_filename, "wb") as f_out:
+            i = 1
+            if progress == "tqdm":
+                pbar = tqdm(desc="descrypting", total=chunks_number)
+            while True:
+                if progress == "tqdm":
+                    pbar.update(1)
+                else:
+                    os.system(f"echo {int(i / chunks_number * 100)}")
+                chunk = f_in.read(CHUNKS)
+                if len(chunk) == 0:
+                    break
+                f_out.write(decryptor.decrypt(chunk))
+                i += 1
+            f_out.truncate(file_size)
+    if progress == "tqdm": print(f"file '{file}' was decrypted")
+    return out_filename
+
+@argh.arg("--encrypt", "-e", help="encrypt a file")
+@argh.arg("--decrypt", "-d", help="decrypt a file")
+@argh.arg("filename", help="which file to work with")
+@argh.arg("--remove-original-file", "-r", help="remove the original file afterwards")
+@argh.arg("--passwd-from-stdin", "-s", help="read the encryption/decryption password from stdin")
+@argh.arg("--progress", "-p", help="write progress status to stdout (zenity-style)")
+def run(filename, encrypt=False, decrypt=False, remove_original_file=False, passwd_from_stdin=False, progress=False):
+    if encrypt and decrypt:
+        print("You cannot encrypt and decrypt a file at the same time")
+        sys.exit(1)
+    if not encrypt and not decrypt:
+        encrypt=True
+
+    if passwd_from_stdin:
+        pass1 = sys.stdin.read()
+    else:
+        pass1 = getpass(f"password for {filename}: ")
+
+    if progress:
+        progress = "zenity"
+    else:
+        progress = "tqdm"
+
+    if encrypt:
+        if not passwd_from_stdin:
+            pass2 = getpass("confirm password: ")
+            if pass1 != pass2:
+                print("passwords do not match!")
+                sys.exit(1)
+        out_filename = encrypt_file(filename, pass1, progress)
+    if decrypt:
+        out_filename = decrypt_file(filename, pass1, progress)
+    if not progress: print(f"saved to '{out_filename}'")
+    if remove_original_file:
+        os.remove(filename)
+        print(f"'{filename}' was removed")
+
+if __name__ == "__main__":
+    argh.dispatch_command(run)
+
