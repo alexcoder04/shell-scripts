@@ -1,0 +1,82 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021 alexcoder04 <https://github.com/alexcoder04>
+# 
+# a rather crappy script to run bspwm commands in a menu
+
+. libsh || exit 1
+
+commands="node\ndesktop\nmonitor\nquery\nrule\nconfig\nsubscribe\nquit"
+selected_cmd="$(echo "$commands" | prompt_gui "bspc")"
+
+[ -z "$selected_cmd" ] && exit 0
+
+case "$selected_cmd" in
+  node)
+    selected_action="$(echo "-f --focus
+-a --activate
+-d --to-desktop
+-m --to-monitor
+-n --to-node
+-s --swap
+-p --presel-dir
+-o --presel-ratio
+-v --move
+-z --resize
+-r --ratio
+-R --rotate
+-F --flip
+-E --equalize
+-B --balance
+-C --circulate
+-t --state
+-g --flag
+-l --layer
+-i --insert-receptacle
+-c --close
+-k --kill" \
+    | prompt_gui "bspc node" | cut -d" " -f1)"
+    selected_node="$(echo "focused
+next
+west
+east
+north
+south
+prev
+any
+older
+newer
+pointed
+biggest
+smallest
+brother
+parent
+first
+second" | prompt_gui "bspc node $selected_action")"
+    bspc $selected_cmd $selected_action $selected_node
+    ;;
+  desktop)
+    selected_action="$(echo "-f --focus
+-a --activate
+-m --to-monitor
+-s --swap
+-l --layout
+-n --rename
+-b --bubble
+-r --remove" | prompt_gui "bspc desktop" | cut -d" " -f1)"
+  selected_desktop="$(echo "focused
+any
+older
+newer
+next
+prev" | prompt_gui "bspc desktop $selected_action")"
+  bspc $selected_cmd $selected_action $selected_desktop ;;
+  *)
+    bspc $selected_cmd $(prompt_gui "bspc $selected_cmd") ;;
+esac
+
