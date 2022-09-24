@@ -1,0 +1,83 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021-2022 alexcoder04 <https://github.com/alexcoder04>
+# 
+# creating or editing a MD file in the school folder
+
+SCHOOL_FOLDER="$HOME/School"
+
+. libsh || exit 1
+
+write_template(){
+    if [ "$1" = "beamer" ]; then
+        cat >>"$filename" <<EOF
+---
+title: $title
+author: $USER
+date: $date_readable
+theme:
+ - CambridgeUS
+colortheme:
+ - crane
+fonttheme:
+ - serif
+aspectratio: 169
+---
+
+<++>
+
+EOF
+    else
+        cat >>"$filename" <<EOF
+---
+title: $title
+author: $USER
+date: $date_readable
+header-includes: |
+    \\usepackage{fancyhdr} \\pagestyle{fancy}
+    \\fancyhead[L]{$date_readable}
+    \\fancyhead[C]{\uppercase{$title}}
+    \\fancyhead[R]{$subject}
+---
+
+<++>
+
+EOF
+    fi
+}
+
+subject="$(/bin/ls "$SCHOOL_FOLDER" | prompt_gui "Subject")"
+
+[ -z "$subject" ] && exit 0
+
+[ -d "$SCHOOL_FOLDER/$subject" ] || mkdir -p "$SCHOOL_FOLDER/$subject"
+cd "$SCHOOL_FOLDER/$subject"
+
+title="$(/bin/ls "$SCHOOL_FOLDER/$subject/"*.md | prompt_gui "Title")"
+title_normalized="$(echo "$title" | sed 's/\s/_/g; s/\//_/g')"
+this_date="$(date +%Y%m%d-%a)"
+date_readable="$(date "+%a, %d.%m.%Y")"
+
+[ -z "$title" ] && exit 0
+
+if [ "${title##*.}" = "md" ]; then
+  filename="$title"
+elif [ "${title##*.}" = "create" ]; then
+  title="${title%%.*}"
+  title_normalized="${title_normalized%%.*}"
+  filename="$this_date-$title_normalized.md"
+  [ -e "$filename" ] \
+    && die_notify "File you are trying to create already exists"
+else
+  filename="$this_date-$title_normalized.md"
+fi
+
+[ -e "$filename" ] || write_template "$1"
+
+exec launch "$EDITOR" "$filename"
+

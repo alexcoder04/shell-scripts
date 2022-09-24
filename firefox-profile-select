@@ -1,0 +1,37 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021-2022 alexcoder04 <https://github.com/alexcoder04>
+# 
+# menu to select and load firefox profiles
+# !profiles have to named exactly as the folder they are saved in
+# ("work" -> $XDG_DATA_HOME/mozilla/work.tar.lz4)
+
+. libsh || exit 1
+
+# select profile to start
+selected="$(/bin/ls "${XDG_DATA_HOME:-$HOME/.local/share}/mozilla" | cut -d "." -f 1 | prompt_gui "firefox: " | tail -n 1)"
+
+[ -z "$selected" ] && exit 0
+
+# if already loaded, just start
+if [ -d "/media/cache/mozilla/profiles/$selected" ]; then
+  exec firefox -P "$selected"
+fi
+
+# load to ram and start
+if [ -f "$XDG_DATA_HOME/mozilla/$selected.tar.lz4" ]; then
+  # decompressing may take some time, so inform the user
+  lp_inform_gui "loading $selected firefox profile..."
+  lz4 -dc "${XDG_DATA_HOME:-$HOME/.local/share}/mozilla/$selected.tar.lz4" \
+    | tar -xp -f - -C "/media/cache/mozilla/profiles"
+  exec firefox -P "$selected"
+fi
+
+# if you type in bullshit, nothing happens
+die_gui "this firefox profile does not exist"
+
