@@ -1,0 +1,30 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021-2022 alexcoder04 <https://github.com/alexcoder04>
+#                                                          
+# a script that changes i3 settings
+
+. libsh || exit 1
+
+MODES="blocks\npowerline\npolybar"
+
+[ -z "$DOTFILES_REPO" ] \
+  && die_gui '$DOTFILES_REPO not defined!'
+
+install_config(){
+  cd "$DOTFILES_REPO" || die_gui "Dotfiles folder does not exist"
+  choice="$(echo "$MODES" | prompt_gui "${1}i3")"
+  [ -z "$choice" ] && exit 0
+  RECONF_I3_MODE="${1}$choice" ./install i3 && return 0 || return 1
+}
+
+case "$(get_desktop)" in
+  i3)   install_config ""       && i3-msg restart ;;
+  sway) install_config "sway-"  && swaymsg reload ;;
+  *)    die_gui "Not running i3" ;;
+esac
