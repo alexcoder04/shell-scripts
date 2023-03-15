@@ -1,0 +1,20 @@
+#!/bin/sh
+#        _                        _            ___  _  _   
+#   __ _| | _____  _____ ___   __| | ___ _ __ / _ \| || |  
+#  / _` | |/ _ \ \/ / __/ _ \ / _` |/ _ \ '__| | | | || |_ 
+# | (_| | |  __/>  < (_| (_) | (_| |  __/ |  | |_| |__   _|
+#  \__,_|_|\___/_/\_\___\___/ \__,_|\___|_|   \___/   |_|  
+# 
+# Copyright (c) 2021-2022 alexcoder04 <https://github.com/alexcoder04>
+# 
+# set my prefered keyboard layout in xorg
+# my options:
+#  - german layout
+#  - set caps to be a second escape key
+
+. libsh || exit 1
+
+xset r rate 200 70
+setxkbmap -layout "${KEYBOARD_LAYOUT:-de}" -option "caps:escape" \
+  && lp_inform_gui "keyboard layout fixed"
+
